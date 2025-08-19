@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruleta de Premios - Dos Jugadores</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#333">
+  <link rel="icon" href="icon-192.png" type="image/png">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #wheel {
+      width: 300px;
+      height: 300px;
+      border: 10px solid #333;
+      border-radius: 50%;
+      position: relative;
+    }
+    .spin-btn {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .inputs {
+      margin: 20px auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      max-width: 400px;
+    }
+    .inputs input, .players input {
+      padding: 5px;
+      text-align: center;
+    }
+    #update, #resetBtn {
+      margin-top: 10px;
+      padding: 8px 15px;
+      cursor: pointer;
+    }
+    #configSection {
+      display: none;
+      margin-top: 20px;
+      border: 2px solid #333;
+      padding: 15px;
+      border-radius: 10px;
+      background: #f9f9f9;
+    }
+    #configBtn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .players {
+      margin: 20px auto;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎯 Ruleta de Premios</h1>
+
+<canvas id="wheel" width="300" height="300"></canvas>
+<br>
+<button class="spin-btn" id="spinP1">🎲 Girar Jugador 1</button>
+<button class="spin-btn" id="spinP2">🎲 Girar Jugador 2</button>
+
+<!-- Botón para mostrar/ocultar configuración -->
+<button id="configBtn">⚙️ Configuración</button>
+
+<!-- Sección editable oculta -->
+<div id="configSection">
+  <h2>Editar Nombres de Jugadores</h2>
+  <div class="players">
+    <input type="text" id="player1Name" value="Jugador 1">
+    <input type="text" id="player2Name" value="Jugador 2">
+  </div>
+
+  <h2>Editar Premios</h2>
+  <div class="inputs" id="inputs"></div>
+  <button id="update">Actualizar Ruleta</button>
+  <br>
+  <button id="resetBtn">🔄 Restablecer</button>
+</div>
+
+<script>
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+
+  const defaultSegments = ["Premio 1", "Premio 2", "Premio 3", "Premio 4", "Premio 5", "Premio 6", "Premio 7", "Premio 8"];
+  const defaultPlayer1 = "Jugador 1";
+  const defaultPlayer2 = "Jugador 2";
+
+  let segments = JSON.parse(localStorage.getItem("segments")) || [...defaultSegments];
+  let player1Name = localStorage.getItem("player1Name") || defaultPlayer1;
+  let player2Name = localStorage.getItem("player2Name") || defaultPlayer2;
+
+  const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#FF8C00", "#8A2BE2", "#3CB371", "#DC143C"];
+  let startAngle = 0;
+  let anglePerSegment = 2 * Math.PI / segments.length;
+
+  document.getElementById("player1Name").value = player1Name;
+  document.getElementById("player2Name").value = player2Name;
+
+  const inputsDiv = document.getElementById("inputs");
+  function renderInputs() {
+    inputsDiv.innerHTML = "";
+    segments.forEach((seg, i) => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = seg;
+      input.dataset.index = i;
+      inputsDiv.appendChild(input);
+    });
+  }
+
+  function updateSegments() {
+    const inputs = document.querySelectorAll("#inputs input");
+    segments = Array.from(inputs).map(input => input.value || `Premio ${parseInt(input.dataset.index)+1}`);
+    anglePerSegment = 2 * Math.PI / segments.length;
+    drawWheel();
+    saveData();
+  }
+
+  function drawWheel() {
+    ctx.clearRect(0, 0, 300, 300);
+    for (let i = 0; i < segments.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(150, 150);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.arc(150, 150, 150, startAngle + i * anglePerSegment, startAngle + (i + 1) * anglePerSegment);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(150, 150);
+      ctx.rotate(startAngle + i * anglePerSegment + anglePerSegment / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#000";
+      ctx.font = "14px Arial";
+      ctx.fillText(segments[i], 140, 5);
+      ctx.restore();
+    }
+  }
+
+  function spin(player) {
+    let validIndexes = player === 1
+      ? segments.map((_, i) => i).filter(i => i % 2 === 0)
+      : segments.map((_, i) => i).filter(i => i % 2 !== 0);
+
+    const index = validIndexes[Math.floor(Math.random() * validIndexes.length)];
+    const spins = Math.floor(Math.random() * 5) + 5;
+    const targetAngle = (segments.length - index) * anglePerSegment;
+    const angle = spins * 2 * Math.PI + targetAngle;
+    const duration = 3000;
+    const start = performance.now();
+
+    function animate(time) {
+      const elapsed = time - start;
+      if (elapsed < duration) {
+        const currentAngle = angle * (elapsed / duration);
+        ctx.clearRect(0, 0, 300, 300);
+        startAngle = currentAngle % (2 * Math.PI);
+        drawWheel();
+        requestAnimationFrame(animate);
+      } else {
+        startAngle = angle % (2 * Math.PI);
+        drawWheel();
+        const playerName = player === 1 ? document.getElementById("player1Name").value : document.getElementById("player2Name").value;
+        alert(`🎉 ${playerName} obtuvo: ${segments[index]}`);
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function saveData() {
+    localStorage.setItem("segments", JSON.stringify(segments));
+    localStorage.setItem("player1Name", document.getElementById("player1Name").value);
+    localStorage.setItem("player2Name", document.getElementById("player2Name").value);
+  }
+
+  function resetData() {
+    if (confirm("⚠️ ¿Seguro que quieres restablecer la ruleta a valores iniciales?")) {
+      localStorage.clear();
+      segments = [...defaultSegments];
+      document.getElementById("player1Name").value = defaultPlayer1;
+      document.getElementById("player2Name").value = defaultPlayer2;
+      anglePerSegment = 2 * Math.PI / segments.length;
+      renderInputs();
+      drawWheel();
+      document.getElementById("configSection").style.display = "none";
+      alert("✅ Ruleta restablecida con éxito");
+    }
+  }
+
+  document.getElementById("update").onclick = updateSegments;
+  document.getElementById("resetBtn").onclick = resetData;
+  document.getElementById("spinP1").onclick = () => spin(1);
+  document.getElementById("spinP2").onclick = () => spin(2);
+
+  document.getElementById("player1Name").addEventListener("input", saveData);
+  document.getElementById("player2Name").addEventListener("input", saveData);
+
+  const configBtn = document.getElementById("configBtn");
+  const configSection = document.getElementById("configSection");
+  configBtn.onclick = () => {
+    configSection.style.display = (configSection.style.display === "none" || configSection.style.display === "") ? "block" : "none";
+  };
+
+  renderInputs();
+  drawWheel();
+
+  // ✅ Registrar Service Worker para PWA
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js");
+  }
+</script>
+
+</body>
+  </html>
