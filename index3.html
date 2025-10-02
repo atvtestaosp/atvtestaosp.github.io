@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ruleta de Premios - Dos Jugadores</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      overflow: hidden; /* Para que los corazones no generen scroll */
+    }
+    #wheel {
+      width: 300px;
+      height: 300px;
+      border: 10px solid #333;
+      border-radius: 50%;
+      position: relative;
+    }
+    .spin-btn {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .inputs {
+      margin: 20px auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      max-width: 400px;
+    }
+    .inputs input {
+      padding: 5px;
+      text-align: center;
+    }
+    #update {
+      margin-top: 10px;
+      padding: 8px 15px;
+      cursor: pointer;
+    }
+    .heart {
+      position: absolute;
+      color: red;
+      font-size: 20px;
+      animation: floatUp 3s linear forwards;
+      pointer-events: none;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-200px) scale(1.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎯 Ruleta de Premios</h1>
+
+<!-- Nombres jugadores -->
+<h3>
+  <input id="p1Name" value="Jugador 1"> 
+  <input id="p2Name" value="Jugador 2">
+</h3>
+
+<canvas id="wheel" width="300" height="300"></canvas>
+<br>
+<button class="spin-btn" id="spinP1">🎲 Girar Jugador 1</button>
+<button class="spin-btn" id="spinP2">🎲 Girar Jugador 2</button>
+
+<h2>Editar Premios</h2>
+<div class="inputs" id="inputs"></div>
+<button id="update">Actualizar Ruleta</button>
+
+<script>
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  let segments = ["Premio 1", "Premio 2", "Premio 3", "Premio 4", "Premio 5", "Premio 6", "Premio 7", "Premio 8"];
+  const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#FF8C00", "#8A2BE2", "#3CB371", "#DC143C"];
+  let startAngle = 0;
+  let anglePerSegment = 2 * Math.PI / segments.length;
+
+  const inputsDiv = document.getElementById("inputs");
+  function renderInputs() {
+    inputsDiv.innerHTML = "";
+    segments.forEach((seg, i) => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = seg;
+      input.dataset.index = i;
+      inputsDiv.appendChild(input);
+    });
+  }
+
+  function updateSegments() {
+    const inputs = document.querySelectorAll("#inputs input");
+    segments = Array.from(inputs).map(input => input.value || `Premio ${parseInt(input.dataset.index)+1}`);
+    anglePerSegment = 2 * Math.PI / segments.length;
+    drawWheel();
+  }
+
+  function drawWheel() {
+    ctx.clearRect(0, 0, 300, 300);
+    for (let i = 0; i < segments.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(150, 150);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.arc(150, 150, 150, startAngle + i * anglePerSegment, startAngle + (i + 1) * anglePerSegment);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(150, 150);
+      ctx.rotate(startAngle + i * anglePerSegment + anglePerSegment / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#000";
+      ctx.font = "14px Arial";
+      ctx.fillText(segments[i], 140, 5);
+      ctx.restore();
+    }
+  }
+
+  function spin(player) {
+    let validIndexes = [];
+    if (player === 1) {
+      validIndexes = segments.map((_, i) => i).filter(i => i % 2 === 0);
+    } else {
+      validIndexes = segments.map((_, i) => i).filter(i => i % 2 !== 0);
+    }
+
+    const index = validIndexes[Math.floor(Math.random() * validIndexes.length)];
+    const spins = Math.floor(Math.random() * 5) + 5;
+    const targetAngle = (segments.length - index) * anglePerSegment;
+    const angle = spins * 2 * Math.PI + targetAngle;
+    const duration = 3000;
+    const start = performance.now();
+
+    function animate(time) {
+      const elapsed = time - start;
+      if (elapsed < duration) {
+        const currentAngle = angle * (elapsed / duration);
+        ctx.clearRect(0, 0, 300, 300);
+        startAngle = currentAngle % (2 * Math.PI);
+        drawWheel();
+        requestAnimationFrame(animate);
+      } else {
+        startAngle = angle % (2 * Math.PI);
+        drawWheel();
+        const winner = player === 1 ? document.getElementById("p1Name").value : document.getElementById("p2Name").value;
+        alert(`🎉 ${winner} obtuvo: ${segments[index]}`);
+        launchHearts();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function launchHearts() {
+    for (let i = 0; i < 15; i++) {
+      const heart = document.createElement("div");
+      heart.className = "heart";
+      heart.innerHTML = "❤️";
+      heart.style.left = Math.random() * window.innerWidth + "px";
+      heart.style.top = (window.innerHeight - 50) + "px";
+      heart.style.fontSize = (20 + Math.random() * 20) + "px";
+      document.body.appendChild(heart);
+
+      setTimeout(() => { heart.remove(); }, 3000);
+    }
+  }
+
+  document.getElementById("update").onclick = updateSegments;
+  document.getElementById("spinP1").onclick = () => spin(1);
+  document.getElementById("spinP2").onclick = () => spin(2);
+
+  renderInputs();
+  drawWheel();
+</script>
+
+</body>
+</html>
